@@ -70,14 +70,13 @@ export default function Home() {
         body && typeof body === "object" && typeof body.type === "string" ? body : null;
 
       if (!data) {
-        setMessages((m) => [
-          ...m,
-          {
-            role: "assistant",
-            kind: "text",
-            text: "Something went wrong on my end just now — mind trying that again?",
-          },
-        ]);
+        // Validation failures come back as { error: "..." } — show the real reason
+        // rather than a generic shrug, so the user knows what to do differently.
+        const reason =
+          body && typeof body === "object" && typeof (body as { error?: unknown }).error === "string"
+            ? (body as { error: string }).error
+            : "Something went wrong on my end just now — mind trying that again?";
+        setMessages((m) => [...m, { role: "assistant", kind: "text", text: reason }]);
         return;
       }
 
@@ -237,6 +236,7 @@ function Composer({
           }
         }}
         rows={1}
+        maxLength={4000}
         placeholder={placeholder}
         className="max-h-40 flex-1 resize-none rounded-2xl border border-warm bg-white px-4 py-3 text-sm text-ink shadow-sm outline-none focus:border-sage"
       />

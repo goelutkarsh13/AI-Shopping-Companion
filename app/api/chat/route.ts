@@ -2,30 +2,46 @@ import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
 import { SYSTEM_PROMPT, parseAdvisorResponse } from "@/lib/advisor";
 import { activeProviderLabel, fetchProducts, productsToContext } from "@/lib/data";
+import { demoRespond } from "@/lib/demo";
+import { clientKey, rateLimit } from "@/lib/ratelimit";
+import { LIMITS, validateMessages } from "@/lib/validation";
 
 export const runtime = "nodejs";
 
-type IncomingMessage = { role: "user" | "assistant"; content: string };
-
 export async function POST(req: NextRequest) {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
+  // Rate limit before doing any work — the point is to spend nothing on abusive traffic.
+  const limit = rateLimit(
+    clientKey(req.headers),
+    LIMITS.requestsPerWindow,
+    LIMITS.windowMs
+  );
+  if (!limit.ok) {
     return NextResponse.json(
-      { type: "reply", message: "The companion isn't connected yet — add your ANTHROPIC_API_KEY to .env.local and restart." },
-      { status: 200 }
+      {
+        type: "reply",
+        message: "You're going a bit fast for me — give me a moment and try again.",
+      },
+      { status: 429, headers: { "Retry-After": String(limit.retryAfter) } }
     );
   }
 
-  let messages: IncomingMessage[] = [];
+  let body: unknown;
   try {
-    const body = await req.json();
-    messages = Array.isArray(body?.messages) ? body.messages : [];
+    body = await req.json();
   } catch {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  if (messages.length === 0) {
-    return NextResponse.json({ error: "No messages provided." }, { status: 400 });
+  const parsedInput = validateMessages((body as { messages?: unknown })?.messages);
+  if (!parsedInput.ok) {
+    return NextResponse.json({ error: parsedInput.error }, { status: 400 });
+  }
+  const messages = parsedInput.messages;
+
+  // No key? Stay useful instead of showing a dead end — see lib/demo.ts.
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    return NextResponse.json(demoRespond(messages), { status: 200 });
   }
 
   // Ground the advice in live product data when a provider is configured.

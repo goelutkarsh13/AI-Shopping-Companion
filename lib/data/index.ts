@@ -3,10 +3,13 @@
 // falls back to its own knowledge — the app never breaks on missing data.
 
 import type { ProductResult, ShoppingProvider } from "./types";
+import { discountPercent } from "./types";
+import { extractSearchTerms } from "./query";
 import { SerpApiProvider } from "./serpapi";
 import { ShopifyStorefrontProvider } from "./shopify";
 
 export type { ProductResult } from "./types";
+export { discountPercent } from "./types";
 
 function getProvider(): ShoppingProvider | null {
   // Shopify Storefront API is preferred when configured: it's the official API, it's free,
@@ -47,8 +50,14 @@ export function activeProviderLabel(): string | null {
 export async function fetchProducts(query: string, limit = 6): Promise<ProductResult[]> {
   const provider = getProvider();
   if (!provider || !query.trim()) return [];
+
+  // People ask questions; catalog APIs want keywords. Without this, "Is the Compare at
+  // Price Snowboard worth it?" is sent verbatim to the search index and matches nothing.
+  const terms = extractSearchTerms(query);
+  if (!terms) return [];
+
   try {
-    return await provider.search(query.trim(), limit);
+    return await provider.search(terms, limit);
   } catch (err) {
     console.error("Shopping data fetch failed:", err);
     return [];
@@ -56,14 +65,25 @@ export async function fetchProducts(query: string, limit = 6): Promise<ProductRe
 }
 
 // Compact, model-friendly rendering of live results for the system prompt.
+// Includes the honesty signals (real vs. fake markdowns, availability) so the advisor can
+// call them out — that's the part a seller's own product page wouldn't tell you.
 export function productsToContext(products: ProductResult[]): string {
   if (products.length === 0) return "";
   const lines = products.map((p, i) => {
+    const pct = discountPercent(p);
     const bits = [
       `${i + 1}. ${p.title}`,
+      p.vendor ? `by: ${p.vendor}` : null,
       p.price ? `price: ${p.price}` : null,
+      pct !== null && p.compareAtPrice
+        ? `was: ${p.compareAtPrice} (a real ${pct}% markdown)`
+        : null,
       p.source ? `at: ${p.source}` : null,
       p.rating ? `rating: ${p.rating}${p.reviews ? ` (${p.reviews} reviews)` : ""}` : null,
+      p.availableForSale === false ? `NOTE: currently out of stock` : null,
+      typeof p.variantCount === "number" && p.variantCount > 0
+        ? `${p.variantCount} option(s) in stock`
+        : null,
       p.delivery ? `delivery: ${p.delivery}` : null,
     ].filter(Boolean);
     return bits.join(" · ");
