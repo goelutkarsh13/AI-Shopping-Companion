@@ -145,11 +145,13 @@ the live model and scores each against a charter line:
 | `genuinely-worth-it` | **Willing to say yes** — an advisor that always says no is just as useless |
 | `no-data-humility` | Won't fabricate specs for a product it knows nothing about |
 
-The first live run scored 31/36 — and the failing case turned out to be a **bug in the eval,
-not the advisor**. It had asked a second clarifying question instead of ruling, which was the
-right call for a user who'd just said they didn't know what they wanted; my checks had assumed
-a verdict was always due. Fixing the prompt to satisfy the test would have taught it to guess.
-Written up in [`DECISIONS.md`](./DECISIONS.md#9-measuring-honesty-not-just-correctness).
+The first live run scored 31/36, and the failing case turned out to be a **bug in the eval, not
+the advisor** — twice over. It declined to rule on a product that doesn't exist, which was
+correct; my checks had assumed a verdict was always due. Two rounds of failures landed entirely
+on response *shape* while every check encoding the actual promise passed, so the shape
+constraint went rather than the prompt. Fixing the advisor to satisfy the test would have taught
+it to guess. Written up in
+[`DECISIONS.md`](./DECISIONS.md#9-measuring-honesty-not-just-correctness).
 
 Every check is deterministic — no LLM judge, no rubric. A charter violation should be as
 unambiguous as a failing test. The graders are themselves unit-tested (`evals/cases.test.ts`),

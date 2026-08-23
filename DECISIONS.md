@@ -204,16 +204,31 @@ a product that doesn't exist. Producing a confident verdict there would have mea
 precisely the behaviour the rest of the charter forbids. The eval had quietly encoded an
 assumption that isn't true: *two user turns means a verdict is due.*
 
-So the fix went into the test, not the prompt: `mustBeVerdictOrQuestion` accepts a fair
-clarifying question, and `mustAcknowledgeUncertainty` asserts the thing the case was actually
-about — that it admits ignorance rather than inventing knowledge. The urgency and
-invented-discount checks became type-agnostic at the same time, since a clarifying question can
-rush or mislead someone just as easily as a verdict can.
+So the fix went into the test, not the prompt: the checks became type-agnostic, and
+`mustAcknowledgeUncertainty` was added to assert what the case was actually about — that it
+admits ignorance rather than inventing knowledge.
+
+**Then it failed again**, differently. On the second run the advisor answered with a plain
+`reply` — *"I'm not familiar with that one"* — rather than a question or a verdict. Correct
+behaviour once more, and a legitimate response type under its own contract, but my relaxed
+shape check still rejected it.
+
+Two failures on shape, zero on substance, is itself a signal. The three checks encoding the
+actual promise — admits ignorance, invents no discount, applies no urgency — passed on both
+runs. So the shape constraint was dropped entirely for this case. What must hold is the
+honesty, in whatever form it arrives.
+
+That sequence is worth being uncomfortable about, because "loosen the test until it passes" is
+exactly how evals get hollowed out. The distinction that makes it defensible here: the
+assertions that encode the *promise* were never the ones failing, and were never weakened.
+Only an assumption about output formatting was — one that had no business being in a test about
+fabrication.
 
 The general lesson, and the reason this is written down: **a failing eval is a hypothesis, not
-a verdict.** Changing the prompt until the test goes green would have taught the advisor to
+a verdict.** Changing the prompt until the test went green would have taught the advisor to
 guess when it shouldn't — making the product worse while making the dashboard greener. Read
-what the model actually did before assuming it was wrong.
+what the model actually did before assuming it was wrong; then ask whether the thing that
+failed is the thing you meant to measure.
 
 ## 10. Known limitations
 
