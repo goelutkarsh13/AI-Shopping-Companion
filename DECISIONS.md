@@ -161,16 +161,49 @@ has to be re-made every time the code changes, and it's not a judgement a review
 `npm audit` on the repo can verify at a glance. A clean tree is cheaper to maintain than a
 documented-exception list.
 
-## 9. Known limitations
+## 9. Measuring honesty, not just correctness
+
+Unit tests prove the advisor's output is well-formed. They say nothing about whether it's
+*honest* — and honesty is the entire value proposition. A model drifting toward
+agreeableness after a prompt edit would sail through every test in `lib/`.
+
+So `evals/` scores seven realistic conversations against charter lines: does it refuse to
+invent a markdown the catalog doesn't show? Does it lead with out-of-stock? Does it stay
+honest when the user pushes back emotionally? Does it manufacture urgency?
+
+Two decisions worth defending:
+
+**Every check is deterministic.** No LLM judge, no rubric scoring. It's tempting to grade
+warmth and tone with another model call, but that trades a clear signal for a fuzzy one:
+a charter violation should be as unambiguous as a failing assertion. String checks can't
+measure whether advice is *kind* — they can measure whether it invented a discount, and
+that's the failure that actually breaks the promise.
+
+**One scenario requires a "Worth it".** An advisor that says Skip to everything would score
+perfectly on naive honesty checks while being useless. Independence means being *able* to
+say no, not being reflexively negative, so the eval set fails a model that can't say yes.
+
+The graders are themselves unit-tested. A broken grader is worse than no grader — it
+reports all-clear while the product quietly breaks its word.
+
+Evals aren't in CI because they cost API credits and the model is non-deterministic. They're
+run deliberately after prompt changes, with `--runs=3` to distinguish a real regression from
+a flaky one.
+
+## 10. Known limitations
 
 Stated plainly, because a portfolio piece that claims to be finished is less credible than
 one that knows what it isn't:
 
-- Verdict quality is unmeasured. There's no eval set, no human rating, no way to know if
-  the advice is *good* — only that it's well-formed. Phase 4 (testing with real solo
-  deciders) is where that gets addressed.
+- **Verdict quality is only partially measured.** The evals catch charter violations —
+  invented discounts, missing caveats, manufactured urgency. They cannot tell you whether
+  the advice is *good*: whether the reasoning is sound, whether the alternatives are the
+  right ones, whether it felt like talking to a friend. That needs humans. Phase 4 (testing
+  with real solo deciders) is where it gets addressed.
 - Shopify search quality is only as good as one store's catalog and Shopify's own query
-  matching; there's no semantic fallback when a query doesn't match cleanly.
+  matching. `lib/data/query.ts` is stopword removal, not semantics — "something for cold
+  weather" won't find a jacket.
 - The rate limiter's per-instance scope, as above.
 - No observability. A production version would need structured logging and per-request
   cost tracking.
+- Saved verdicts are per-browser. Clear your site data and they're gone.

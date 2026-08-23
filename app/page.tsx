@@ -116,7 +116,7 @@ export default function Home() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-2xl flex-col px-4">
+    <main className="mx-auto flex min-h-dvh max-w-2xl flex-col px-4">
       <header className="flex items-center gap-2 pb-2 pt-6">
         <button
           onClick={resetToNew}
@@ -130,7 +130,8 @@ export default function Home() {
         <div className="ml-auto flex items-center gap-2">
           <button
             onClick={() => setDrawerOpen(true)}
-            className="rounded-full border border-warm bg-white/60 px-3 py-1 text-[11px] text-sagedark transition hover:bg-white"
+            aria-label={`Saved decisions${saved.length ? ` (${saved.length})` : " (none yet)"}`}
+            className="rounded-full border border-warm bg-white/60 px-3 py-2 text-[11px] text-sagedark transition hover:bg-white"
           >
             Saved{saved.length ? ` · ${saved.length}` : ""}
           </button>
@@ -144,7 +145,15 @@ export default function Home() {
         <Landing onPick={send} input={input} setInput={setInput} loading={loading} />
       ) : (
         <>
-          <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto py-4">
+          {/* aria-live so a screen-reader user hears replies arrive; "polite" waits for a
+              pause rather than interrupting whatever they're reading. */}
+          <div
+            ref={scrollRef}
+            role="log"
+            aria-live="polite"
+            aria-label="Conversation"
+            className="flex-1 space-y-4 overflow-y-auto py-4"
+          >
             {messages.map((m, i) =>
               m.kind === "verdict" ? (
                 <VerdictCard key={i} v={m.verdict} topic={topic} onSave={() => handleSave(m.verdict)} />
@@ -223,11 +232,23 @@ function Composer({
   loading: boolean;
   placeholder?: string;
 }) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+
+  // Grow the box to fit what's been typed, up to a cap. Without this a long message
+  // scrolls inside a one-line window, which is miserable on a phone.
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
+  }, [input]);
+
   return (
     <div className="sticky bottom-0 flex items-end gap-2 bg-cream pb-6 pt-2">
       <textarea
+        ref={ref}
         value={input}
-        aria-label="Message"
+        aria-label="Your message"
         onChange={(e) => setInput(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === "Enter" && !e.shiftKey) {
@@ -243,7 +264,8 @@ function Composer({
       <button
         onClick={onSend}
         disabled={loading || !input.trim()}
-        className="rounded-2xl bg-sage px-4 py-3 text-sm font-medium text-cream transition hover:bg-sagedark disabled:opacity-40"
+        aria-label={loading ? "Waiting for a reply" : "Send message"}
+        className="min-h-[44px] rounded-2xl bg-sage px-5 py-3 text-sm font-medium text-cream transition hover:bg-sagedark disabled:opacity-40"
       >
         Ask
       </button>
@@ -270,9 +292,12 @@ function Thinking() {
   return (
     <div className="flex justify-start animate-fadein">
       <div className="flex items-center gap-1 rounded-2xl bg-white px-4 py-3 shadow-sm">
+        {/* The animated dots mean nothing to a screen reader, so state it in words. */}
+        <span className="sr-only">Thinking…</span>
         {[0, 1, 2].map((i) => (
           <span
             key={i}
+            aria-hidden="true"
             className="h-2 w-2 rounded-full bg-sage"
             style={{ animation: "dotpulse 1.2s infinite", animationDelay: `${i * 0.2}s` }}
           />
@@ -327,8 +352,13 @@ function VerdictCard({
   }
 
   return (
-    <div className="animate-fadein rounded-3xl border border-warm bg-white p-5 shadow-sm">
+    <article
+      className="animate-fadein rounded-3xl border border-warm bg-white p-5 shadow-sm"
+      aria-label={`Verdict: ${v.call}`}
+    >
       <div className="flex items-center gap-3">
+        {/* The chip's colour carries meaning for sighted users; the text carries it for
+            everyone else, so the label must never become colour-only. */}
         <span className={`rounded-full px-3 py-1 text-xs font-semibold ${tone.chip}`}>{tone.label}</span>
       </div>
       <p className="mt-3 text-[15px] font-medium leading-snug text-ink">{v.headline}</p>
@@ -376,18 +406,24 @@ function VerdictCard({
       <div className="mt-4 flex items-center gap-2">
         <button
           onClick={doSave}
-          className="rounded-full border border-warm bg-cream px-3 py-1.5 text-xs font-medium text-sagedark transition hover:bg-warm/60"
+          className="min-h-[44px] rounded-full border border-warm bg-cream px-4 py-2 text-xs font-medium text-sagedark transition hover:bg-warm/60"
         >
           {savedFlash ? "Saved ✓" : "Save"}
         </button>
         <button
           onClick={doShare}
-          className="rounded-full border border-warm bg-cream px-3 py-1.5 text-xs font-medium text-sagedark transition hover:bg-warm/60"
+          className="min-h-[44px] rounded-full border border-warm bg-cream px-4 py-2 text-xs font-medium text-sagedark transition hover:bg-warm/60"
         >
           {shareFlash ?? "Share"}
         </button>
+        {/* Save/Share confirm by swapping their own label, which a screen reader won't
+            announce on its own. This mirrors the result into a live region. */}
+        <span aria-live="polite" className="sr-only">
+          {savedFlash ? "Verdict saved" : ""}
+          {shareFlash ?? ""}
+        </span>
       </div>
-    </div>
+    </article>
   );
 }
 
@@ -409,13 +445,34 @@ function SavedDrawer({
   onClose: () => void;
   onRemove: (id: string) => void;
 }) {
+  const closeRef = useRef<HTMLButtonElement>(null);
+
+  // Escape closes it — the behaviour every keyboard user expects from an overlay, and
+  // without it there's no way out except tabbing to the close button.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", onKey);
+    // Move focus into the drawer so keyboard and screen-reader users land inside it
+    // rather than continuing from wherever they were behind the overlay.
+    closeRef.current?.focus();
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
   return (
-    <div className="fixed inset-0 z-20 flex justify-end">
-      <div className="absolute inset-0 bg-ink/20" onClick={onClose} />
+    <div className="fixed inset-0 z-20 flex justify-end" role="dialog" aria-modal="true" aria-label="Saved decisions">
+      {/* Decorative scrim: clicking it closes, but Escape and the button are the
+          accessible paths, so it's hidden from assistive tech. */}
+      <div className="absolute inset-0 bg-ink/20" onClick={onClose} aria-hidden="true" />
       <div className="relative flex h-full w-full max-w-sm flex-col bg-cream shadow-xl animate-fadein">
         <div className="flex items-center justify-between border-b border-warm px-4 py-4">
-          <span className="text-sm font-semibold text-sagedark">Saved decisions</span>
-          <button onClick={onClose} className="text-sm text-ink/50 hover:text-ink">
+          <h2 className="text-sm font-semibold text-sagedark">Saved decisions</h2>
+          <button
+            ref={closeRef}
+            onClick={onClose}
+            className="min-h-[44px] px-2 text-sm text-ink/50 hover:text-ink"
+          >
             Close
           </button>
         </div>
@@ -441,7 +498,8 @@ function SavedDrawer({
                   </span>
                   <button
                     onClick={() => onRemove(s.id)}
-                    className="text-[11px] text-ink/40 hover:text-[#B25B4C]"
+                    aria-label={`Remove saved verdict: ${s.topic}`}
+                    className="min-h-[44px] px-2 text-[11px] text-ink/40 hover:text-[#B25B4C]"
                   >
                     Remove
                   </button>

@@ -8,6 +8,31 @@ body {
   overflow-x: hidden;
 }
 
+/* Mobile browsers report 100vh as the height WITHOUT the address bar, so a 100vh layout
+   gets clipped by the toolbar. 100dvh tracks the actual visible viewport. */
+.min-h-dvh {
+  min-height: 100vh; /* fallback for older browsers */
+  min-height: 100dvh;
+}
+
+/* iOS zooms the page when focusing an input whose font-size is under 16px. Enforcing 16px
+   on small screens keeps the layout still while someone is typing. */
+@media (max-width: 640px) {
+  textarea,
+  input,
+  select {
+    font-size: 16px;
+  }
+}
+
+/* A visible focus ring for keyboard users, without the permanent outline mouse users
+   find noisy. */
+:focus-visible {
+  outline: 2px solid #5b7b6f;
+  outline-offset: 2px;
+  border-radius: 0.5rem;
+}
+
 @keyframes fadein {
   from {
     opacity: 0;
@@ -26,4 +51,21 @@ body {
 @keyframes dotpulse {
   0%, 60%, 100% { opacity: 0.25; }
   30% { opacity: 1; }
+}
+
+/* Motion can trigger nausea and migraines for some people, and the OS-level preference is
+   how they ask for it to stop. Content still appears — it just doesn't move. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .animate-fadein {
+    animation: none;
+  }
 }
