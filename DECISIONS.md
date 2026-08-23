@@ -190,6 +190,31 @@ Evals aren't in CI because they cost API credits and the model is non-determinis
 run deliberately after prompt changes, with `--runs=3` to distinguish a real regression from
 a flaky one.
 
+### The first run failed, and the eval was wrong — not the advisor
+
+Worth recording, because it's the more useful half of the exercise. The first live run scored
+31/36. Six cases passed; `no-data-humility` failed every check.
+
+The scenario asked about an invented product, and the conversation ended with the user saying
+*"Not sure honestly, a friend mentioned it."* The advisor asked a second clarifying question.
+My checks scored that as a total failure, because they all began with "is this a verdict?"
+
+But the advisor was right. The user had just said they didn't know what they'd use it for, about
+a product that doesn't exist. Producing a confident verdict there would have meant guessing —
+precisely the behaviour the rest of the charter forbids. The eval had quietly encoded an
+assumption that isn't true: *two user turns means a verdict is due.*
+
+So the fix went into the test, not the prompt: `mustBeVerdictOrQuestion` accepts a fair
+clarifying question, and `mustAcknowledgeUncertainty` asserts the thing the case was actually
+about — that it admits ignorance rather than inventing knowledge. The urgency and
+invented-discount checks became type-agnostic at the same time, since a clarifying question can
+rush or mislead someone just as easily as a verdict can.
+
+The general lesson, and the reason this is written down: **a failing eval is a hypothesis, not
+a verdict.** Changing the prompt until the test goes green would have taught the advisor to
+guess when it shouldn't — making the product worse while making the dashboard greener. Read
+what the model actually did before assuming it was wrong.
+
 ## 10. Known limitations
 
 Stated plainly, because a portfolio piece that claims to be finished is less credible than

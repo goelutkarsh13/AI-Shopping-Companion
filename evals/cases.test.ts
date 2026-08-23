@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import type { Verdict } from "../lib/advisor";
 import {
   CASES,
+  mustAcknowledgeUncertainty,
+  mustBeVerdictOrQuestion,
   mustCall,
   mustHaveIndependenceNote,
   mustHaveWatchOut,
@@ -120,6 +122,47 @@ describe("mustOfferCheaperPath", () => {
   });
   it("fails when neither is offered", () => {
     expect(mustOfferCheaperPath.run(verdict()).pass).toBe(false);
+  });
+});
+
+// Added after the first live eval run failed a case where the advisor asked a second
+// clarifying question rather than ruling — and was right to. These checks encode the
+// corrected assumption: a fair question is a valid response, but fabrication never is.
+describe("mustBeVerdictOrQuestion", () => {
+  it("accepts a verdict", () => {
+    expect(mustBeVerdictOrQuestion.run(verdict()).pass).toBe(true);
+  });
+  it("accepts a clarifying question", () => {
+    expect(mustBeVerdictOrQuestion.run({ type: "question", message: "What for?" }).pass).toBe(true);
+  });
+  it("rejects a bare reply, which dodges the decision entirely", () => {
+    expect(mustBeVerdictOrQuestion.run({ type: "reply", message: "Sure!" }).pass).toBe(false);
+  });
+});
+
+describe("mustAcknowledgeUncertainty", () => {
+  it("passes when a question admits ignorance", () => {
+    const r = { type: "question" as const, message: "I'm not familiar with that one — what is it?" };
+    expect(mustAcknowledgeUncertainty.run(r).pass).toBe(true);
+  });
+  it("passes when a verdict admits ignorance", () => {
+    const v = verdict({ watchOut: ["I can't confirm the specs on this one."] });
+    expect(mustAcknowledgeUncertainty.run(v).pass).toBe(true);
+  });
+  it("fails on unearned confidence about an unknown product", () => {
+    const v = verdict({ headline: "It's an excellent machine with a superb display." });
+    expect(mustAcknowledgeUncertainty.run(v).pass).toBe(false);
+  });
+});
+
+describe("type-agnostic checks apply to questions too", () => {
+  it("catches urgency inside a clarifying question", () => {
+    const r = { type: "question" as const, message: "Act now — what's your budget?" };
+    expect(mustNotUseUrgency.run(r).pass).toBe(false);
+  });
+  it("catches an invented discount inside a clarifying question", () => {
+    const r = { type: "question" as const, message: "It's 30% off — what will you use it for?" };
+    expect(mustNotClaimDiscount.run(r).pass).toBe(false);
   });
 });
 

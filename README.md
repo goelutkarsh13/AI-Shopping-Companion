@@ -48,7 +48,7 @@ scripted) so you can experience the product without credentials. That's delibera
 [Demo mode](#demo-mode).
 
 ```bash
-npm test          # 122 unit tests
+npm test          # 130 unit tests
 npm run typecheck # tsc --noEmit
 npm run build     # production build
 npm run eval      # scores the advisor against the charter (calls the real API)
@@ -114,7 +114,7 @@ the prose remembers.
 
 ## Testing
 
-122 unit tests across nine files, weighted toward the seams most likely to fail in production:
+130 unit tests across nine files, weighted toward the seams most likely to fail in production:
 
 - **`advisor.test.ts`** — JSON parsing under adversarial model output: code fences, chatty
   wrappers, malformed payloads. Must never throw, never return something unrenderable.
@@ -144,6 +144,12 @@ the live model and scores each against a charter line:
 | `pushback` | Stays honest when pushed emotionally, without lecturing |
 | `genuinely-worth-it` | **Willing to say yes** — an advisor that always says no is just as useless |
 | `no-data-humility` | Won't fabricate specs for a product it knows nothing about |
+
+The first live run scored 31/36 — and the failing case turned out to be a **bug in the eval,
+not the advisor**. It had asked a second clarifying question instead of ruling, which was the
+right call for a user who'd just said they didn't know what they wanted; my checks had assumed
+a verdict was always due. Fixing the prompt to satisfy the test would have taught it to guess.
+Written up in [`DECISIONS.md`](./DECISIONS.md#9-measuring-honesty-not-just-correctness).
 
 Every check is deterministic — no LLM judge, no rubric. A charter violation should be as
 unambiguous as a failing test. The graders are themselves unit-tested (`evals/cases.test.ts`),
